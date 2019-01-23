@@ -1,0 +1,562 @@
+mysql> show processlist;
+mysql> show full processlist;
+mysql> kill <process_id>;
+mysql> SHOW SLAVE STATUS \G
+mysql> STOP SLAVE;
+mysql> SET GLOBAL SQL_SLAVE_SKIP_COUNTER = 1;
+mysql> START SLAVE;
+mysql> SHOW SLAVE STATUS \G
+
+
+packages:
+  mysql: main server
+  mysql-client: client program
+
+mysqladmin --version
+  check server version
+
+mysql
+  connect to server (no password for default installation)
+
+show databases;
+
+mysql -u root password "new_password";
+  set new root password
+
+mysql -u root -p
+  log into mysql with password
+
+mysqld
+  server daemon process
+
+safe_mysqld &
+  startup server id enable a safe shutdown with:
+mysqladmin -u root -p shutdown
+
+setup user:
+  user 
+
+
+#######################################################################################
+
+# database
+SHOW databases;
+CREATE database test1;
+DROP database test1;
+USE database test1;
+SELECT database();			# Show current database
+
+# tables
+CREATE table cats (
+  name VARCHAR (100),
+  age INT
+  );
+
+SHOW TABLES;
+SHOW COLUMNS FROM cats;
+DESC cats;
+DROP cats;
+
+# DATA
+INSERT INTO cats(name, age) VALUES('jetson', 7);
+SELECT * from cats;
+INSERT INTO cats(name, age) VALUES	# Multiple INSERTS
+  (bejen, 42),
+  (aimee, 8),
+  (arya, 7);
+
+# WARNINGS
+INSERT INTO cats(name, age) VALUES('jetson', 'notAnInteger');
+SHOW WARNINGS;
+
+# NULL VALUES
+INSERT INTO cats(name) VALUES('jetson');	# default allows to omit 'age'
+CREATE TABLE cats2(
+  name VARCHAR(100) NOT NULL,
+  age INT NOT NULL
+  );						# 'age' now cannot be null: gets error
+SHOW WARNINGS;
+
+# DEFAULTS
+CREATE TABLE cats3(
+  name VARCHAR(30) DEFAULT 'No Name Provided!',
+  age INT DEFAULT 10
+  );
+DESC cats3;
+
+# PRIMARY KEYS (UNIQUE)
+CREATE TABLE unique_cats(
+  cat_id INT NOT NULL,
+  name VARCHAR(100),
+  age INT,
+  PRIMARY KEY (cat_id)				# Define Primary Key - Cannot repeat
+  );
+
+INSERT INTO unique_cats(cat_id, name, age) VALUES(1, 'Fred', 2);
+INSERT INTO unique_cats(cat_id, name, age) VALUES(1, 'Beje', 3); # dup cat_id/ fails
+
+CREATE TABLE unique_cats2 (
+    cat_id INT NOT NULL AUTO_INCREMENT,		# auto-increments
+    name VARCHAR(100),
+    age INT,
+    PRIMARY KEY (cat_id)
+);
+INSERT INTO unique_cats2(name, age) VALUES('Skippy', 4);
+INSERT INTO unique_cats2(name, age) VALUES('Jiff', 3);
+INSERT INTO unique_cats2(name, age) VALUES('Jiff', 3);
+INSERT INTO unique_cats2(name, age) VALUES('Jiff', 3);
+INSERT INTO unique_cats2(name, age) VALUES('Skippy', 4);
+select * from unique_cats2;	# see cats_id is incremented automatically
+
+# SELECT / WHERE / AS
+SELECT * FROM cats;
+SELECT name FROM cats;
+SELECT name, age FROM cats;
+SELECT name, age FROM cats where age=4;
+SELECT name, age FROM cats where name='aGgLe';	# (Case Insensitive)
+SELECT name, age from cats where cat_id=age;	# Match 2 columns
+SELECT name AS 'cat name', age AS 'cat age' FROM cats;	# aliases
+SELECT cat_id, name AS 'cat name', age AS 'cat age' FROM cats WHERE cat_id=age;
+
+# UPDATE / DELETE
+UPDATE cats SET breed='Shorthair' WHERE breed='Tabby';	# without WHERE updates ALL!
+DELETE from cats WHERE name='EGG';  (Good practise to do SELECT/WHERE from first!)
+DELETE from cats;	# Deletes all records
+DELETE from cats WHERE cat_id=age;
+
+# CONCAT
+SELECT CONCAT(author_fname, author_lname) from books;	# concat 2 colums
+SELECT CONCAT(author_fname, ' ', author_lname) AS 'Full Name' from books; # rename
+SELECT author_fname AS first, author_lname AS last, CONCAT(author_fname, ' ', author_lname) AS fullname from books;
+SELECT CONCAT(title, " - ", author_fname, ' - ', author_lname) FROM books;
+SELECT CONCAT_WS(' - ', title, author_fname, author_lname) FROM books; common delim!
+
+SUBSTRING
+SELECT SUBSTRING(title, 1, 5) FROM books; 	# cut 1st-5th characters and display
+SELECT SUBSTRING(title, 1, 5), SUBSTRING(author_fname, 1, 1), author_lname  FROM books;
+SELECT SUBSTRING(title, 2) FROM books;	# display from 2nd character
+SELECT SUBSTRING(title, -3) FROM books;	# display last 3 characters
+select CONCAT(SUBSTRING(author_fname, 1, 1), '-', author_lname) AS name FROM books;
+
+# REPLACE (only affects query output - does not affect actual data)
+SELECT REPLACE (title, 'e', 3), author_fname FROM books;	# replace 'e' with 3
+SELECT SUBSTRING(REPLACE(title, 'e', '3'), 1, 8) FROM books;	# only 1-8 characters
+
+# REVERSE
+SELECT REVERSE(author_fname) from books;	# again can mis with other functions
+SELECT CONCAT(author_fname, REVERSE(author_fname)) FROM books;
+
+# CHAR_LENGTH
+SELECT author_fname, CHAR_LENGTH(author_fname ) AS 'Length' FROM books;
+SELECT CONCAT(author_fname, ' is ', CHAR_LENGTH(author_fname )) FROM books;
+
+# UPPER
+select UPPER(author_fname ) from books;
+
+# LOWER
+select LOWER(author_fname ) from books;
+
+# *** Remember the order is important as some functions take a single argument
+# *** whilst other might take multiple
+# *** E.g. SELECT UPPER(CONCAT(author_fname, ' ', author_lname)) FROM books; # works
+# ***      SELECT CONCAT(UPPER(author_fname, ' ', author_lname)) FROM books; # fails
+
+# DISTINCT
+SELECT DISTINCT(author_fname ) FROM books;				# unique
+SELECT DISTINCT CONCAT(author_fname,' ', author_lname) FROM books; 	# unique 2 cols
+SELECT DISTINCT author_fname, author_lname FROM books;			# a better way
+
+# ORDER BY
+SELECT author_lname from books ORDER BY author_lname ;
+SELECT title, released_year FROM books ORDER BY released_year;
+SELECT title FROM books ORDER BY released_year;	# doesnt have to show release year in results
+SELECT title FROM books ORDER BY released_year DESC;	# above is same as default "ASC"
+SELECT title , author_fname , author_lname , released_year FROM books ORDER BY 4; # order shortcut
+SELECT title , author_fname , author_lname , released_year FROM books ORDER BY 4, title; # order twice
+
+# LIMIT
+
+SELECT * FROM books LIMIT 2;
+SELECT title, released_year FROM books ORDER BY released_year DESC LIMIT 5;
+SELECT title, released_year FROM books  ORDER BY released_year DESC LIMIT 2,3; # limit 3 start from #2
+SELECT * FROM books LIMIT 95,18446744073709551615;	# no MAX limit reference - specify a large no.
+
+# LIKE
+SELECT title, author_fname FROM books WHERE author_fname LIKE '%da%';	# case insensitive
+SELECT title, author_fname FROM books WHERE author_fname LIKE 'da%'; 	# starting with "da"
+SELECT title, author_fname FROM books WHERE author_fname LIKE '%da';	# ending with "da"
+SELECT title, stock_quantity FROM books WHERE stock_quantity LIKE '___';	# number of characters
+
+# COUNT
+SELECT COUNT(*) from books;
+SELECT COUNT(author_fname ) from books;
+SELECT COUNT(DISTINCT author_fname ) from books;	# unique count
+SELECT COUNT(DISTINCT author_fname ,author_lname ) from books;	# unique on 2 columns count
+SELECT COUNT(*) FROM books WHERE title LIKE '%the%';
+
+# GROUP BY
+SELECT author_lname, COUNT(*)  FROM books GROUP BY author_lname; # this works but not unique firstnames
+SELECT author_fname, author_lname, COUNT(*) FROM books GROUP BY author_lname, author_fname; # works -- the COUNT is used by the GROUP BY
+SELECT released_year, COUNT(*) FROM books GROUP BY released_year; # also works
+
+# MIN/MAX
+SELECT MIN(release_year) FROM books;
+SELECT MIN(pages), title FROM books;
+SELECT MAX(pages) FROM books;
+
+# MIN/MAX with GROUP BY
+SELECT MIN(pages), title FROM books; # Does NOT work (gets MIN pages, but then just 1st title which is independent of the first return (MIN(pages)
+SELECT title, pages FROM books WHERE pages = (SELECT MIN(pages) from books); One way of getting around the above - byt running 2 SQL queries and basing the title on the answer of the second
+SELECT title, pages FROM books ORDER BY pages LIMIT 1; # works much better in this case
+
+SELECT author_fname, author_lname, MIN(released_year ) FROM books GROUP BY author_fname , author_lname;
+
+# SUM
+SELECT author_fname , author_lname , SUM(pages) FROM books GROUP BY author_fname , author_lname;
+
+# AVG
+SELECT author_fname , author_lname , AVG(pages) FROM books GROUP BY author_fname , author_lname;
+
+## Data Types:
+
+# CHAR & VARCHAR
+# CHAR is fixed number of characters where values are either truncated or 
+# white spaces.  Storee size is smaller in memory
+
+# DECIMAL
+# CREATE TABLE items(price DECIMAL(5,2)); # total numbers=5, decimal places=2
+# Larger numbers than 999.99 will be rejected.  Decimals will get rounded to 2
+
+# FLOAT and DOUBLE
+# Smaller size in memory - however inconsistent with larget numbers
+
+# DATE/TIME
+CREATE TABLE people (name VARCHAR(100), bdate DATE, btime TIME, bdt DATETIME);
+INSERT INTO people (name, bdate, btime, bdt) 
+  VALUES('Padma', '1983-11-11', '10:07:35', '1983-11-11 10:07:35');
+
+# Formatting Dates
+SELECT name, DAY(birthdate) FROM people;			# get day of month
+SELECT name, birthdate, DAYNAME(birthdate) FROM people;		# day of week
+SELECT name, birthdate, DAYOFWEEK(birthdate) FROM people;	# as above but digit
+SELECT CONCAT('The date was ', DAYNAME(birthdate), ', ', DAY(birthdate), ' ', MONTHNAME(birthdt), ' ', YEAR(birthdt)) FROM people;
+
+# DATE_FORMAT
+SELECT DATE_FORMAT(birthdt, '%m/%d/%y') FROM people;		# format date
+
+# DATE MATH
+SELECT DATE_ADD(birthdt, INTERVAL 1 MONTH) FROM people;		# add 1 month
+# options: https://dev.mysql.com/doc/refman/5.5/en/date-and-time-functions.html
+
+# TIMESTAMP
+CREATE TABLE comments (content VARCHAR(100), created_at TIMESTAMP DEFAULT NOW());
+CREATE TABLE comments2 (content VARCHAR(100),changed_at TIMESTAMP DEFAULT NOW() ON UPDATE CURRENT_TIMESTAMP); 	# any updates get current timestamp
+INSERT INTO comments2 (content) VALUES('dasdasdasd');
+UPDATE comments2 SET content='THIS IS NOT GIBBERISH' WHERE content='dasdasdasd';
+
+CREATE TABLE comments2 (content VARCHAR(100), changed_at TIMESTAMP DEFAULT NOW() ON UPDATE NOW());		# same as above - CURRENT_TIMESTAMP same as NOW()
+
+#LOGICAL OPERATORS
+SELECT title FROM books WHERE release_year != 2017;	# not equal
+SELECT title FROM books WHERE title NOT LIKE 'the%;	# not begin with "the"
+SELECT title, stock_quantity FROM books WHERE stock_quanitity > 200;
+SELECT title, stock_quantity FROM books WHERE stock_quanitity >= 200;
+SELECT title, stock_quantity FROM books WHERE stock_quanitity < 200;
+SELECT title, stock_quantity FROM books WHERE stock_quanitity <= 200;
+SELECT title FROM books WHERE author_fname='Eggers' AND release_year > 2010;
+SELECT title FROM books WHERE author_fname='Eggers' && release_year > 2010;
+SELECT title FROM books WHERE author_fname='Eggers' OR release_year > 2010;
+SELECT title FROM books WHERE author_fname='Eggers' || release_year > 2010;
+
+SELECT title FROM books WHERE release_year BETWEEN 2004 AND 2005;
+SELECT title FROM books WHERE release_year NOT BETWEEN 2004 AND 2005;
+SELECT name FROM people WHERE birthdt BETWEEN '1980-01-01' AND '2000-01-01';
+SELECT name FROM people WHERE birthdt BETWEEN CAST('1980-01-01' AS DATETIME)
+  AND AND CAST('2000-01-01' AS DATETIME);
+
+# IN/NOT IN Shortcut
+SELECT title FROM books WHERE author_lname='Carver' OR author_lname='Lahiri'
+  OR author_lname='Smith'		# can be written as:
+SELECT title FROM books WHERE author_lname IN ('Carver', 'Lahiri', 'Smith');
+SELECT title FROM books WHERE author_lname NOT IN ('Carver', 'Lahiri', 'Smith');
+
+SELECT title FROM books WHERE release_year >=2000 AND
+  release_year NOT IN (2000, 2002, 2004, 2006);	# can be written as:
+SELECT title FROM books WHERE release_year >=2000 AND release_year %2 != 0;
+
+# CASE
+SELECT title, release_year,
+  CASE
+    WHEN release_year >= 2000 THEN 'Modern Lit'
+    ELSE '20th Century Lit'
+  END AS GENRE
+FROM books;	# add new column GENRE against the CASE statement
+		# can have multiple WHEN descriptions
+
+# FOREIGN KEYS (Setup Example)
+CREATE TABLE customers(
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  first_name VARCHAR(100), last_name VARCHAR(100), email VARCHAR(100));
+CREATE TABLE orders(
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_date DATE, amount DECIMAL(8.2), customer_id INT,
+  FOREIGN KEY(customer_id) REFERENCES customers(id));
+
+# INSERT FROM EXAMPLE DATA:
+INSERT INTO customers (first_name, last_name, email) 
+VALUES ('Boy', 'George', 'george@gmail.com'),
+       ('George', 'Michael', 'gm@gmail.com'),
+       ('David', 'Bowie', 'david@gmail.com'),
+       ('Blue', 'Steele', 'blue@gmail.com'),
+       ('Bette', 'Davis', 'bette@aol.com');
+       
+INSERT INTO orders (order_date, amount, customer_id)
+VALUES ('2016/02/10', 99.99, 1),
+       ('2017/11/11', 35.50, 1),
+       ('2014/12/12', 800.67, 2),
+       ('2015/01/03', 12.50, 2),
+       ('1999/04/11', 450.25, 5);
+
+
+INSERT INTO orders (order_date, amount, customer_id)
+  VALUES ('2016/06/06', 33.67, 98);	# will fail as customer 98 dont exist
+
+# an example of a long way to find customer/order details
+SELECT id FROM customers WHERE last_name='George';
+SELECT * FROM orders WHERE customer_id = 1;
+
+# another way of writing the above (query within a query):
+SELECT * FROM orders WHERE customer_id =
+  ( SELECT id FROM customers WHERE last_name='George');  # find id of George 
+
+# CROSS JOIN
+SELECT * from customers, orders; # this join is nuts!  goes through each customer like a loop.  you wont need this!
+
+# IMPLICIT INNER JOIN (selects only matched from both)
+select * from customers, orders where customers.id = orders.customer_id;
+  # customers.id = customers table, id column.  only need this columns are same
+  # but good practise anyway.
+  # the above is known as an "IMPLICIT" INNER JOIN
+
+# EXPLICIT INNER JOIN
+SELECT * FROM customers JOIN orders ON customers.id = orders.customer_id;
+  # same as above but a prefered way of writing
+SELECT * FROM orders JOIN customers ON customers.id = orders.customer_id;
+  # the other way around!
+
+# you can run regular functions against the above!  for example:
+SELECT first_name, last_name, SUM(amount) AS total_spent FROM customers 
+  JOIN orders ON customers.id = orders.customer_id 
+  GROUP BY orders.customer_id ORDER BY total_spent DESC;
+
+# LEFT JOINS (shows all of left table (including NULLs)
+SELECT * FROM customers LEFT JOIN orders ON customers.id = orders.customer_id;
+
+# replace NULLs with "0"
+SELECT first_name, last_name, IFNULL(SUM(amount),0) AS total 
+  FROM customers LEFT JOIN orders ON customers.id = orders.customer_id  
+  GROUP BY customers.id ORDER BY total;
+
+# RIGHT JOIN (opposite to left and same if you switch tales around)
+SELECT * FROM customers RIGHT JOIN orders ON customers.id = orders.customer_id;
+  # you wont get NULL from the above as its selecting the orders
+
+# MANY TO MANY - Same as above but just JOIN twice!  Example:
+# Create some Data:
+
+CREATE TABLE reviewers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100)
+);
+
+CREATE TABLE series(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(100),
+    released_year YEAR(4),
+    genre VARCHAR(100)
+);
+
+CREATE TABLE reviews (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    rating DECIMAL(2,1),
+    series_id INT,
+    reviewer_id INT,
+    FOREIGN KEY(series_id) REFERENCES series(id),
+    FOREIGN KEY(reviewer_id) REFERENCES reviewers(id)
+);
+
+INSERT INTO series (title, released_year, genre) VALUES
+    ('Archer', 2009, 'Animation'),
+    ('Arrested Development', 2003, 'Comedy'),
+    ("Bob's Burgers", 2011, 'Animation'),
+    ('Bojack Horseman', 2014, 'Animation'),
+    ("Breaking Bad", 2008, 'Drama'),
+    ('Curb Your Enthusiasm', 2000, 'Comedy'),
+    ("Fargo", 2014, 'Drama'),
+    ('Freaks and Geeks', 1999, 'Comedy'),
+    ('General Hospital', 1963, 'Drama'),
+    ('Halt and Catch Fire', 2014, 'Drama'),
+    ('Malcolm In The Middle', 2000, 'Comedy'),
+    ('Pushing Daisies', 2007, 'Comedy'),
+    ('Seinfeld', 1989, 'Comedy'),
+    ('Stranger Things', 2016, 'Drama');
+ 
+ 
+INSERT INTO reviewers (first_name, last_name) VALUES
+    ('Thomas', 'Stoneman'),
+    ('Wyatt', 'Skaggs'),
+    ('Kimbra', 'Masters'),
+    ('Domingo', 'Cortes'),
+    ('Colt', 'Steele'),
+    ('Pinkie', 'Petit'),
+    ('Marlon', 'Crafford');
+    
+ 
+INSERT INTO reviews(series_id, reviewer_id, rating) VALUES
+    (1,1,8.0),(1,2,7.5),(1,3,8.5),(1,4,7.7),(1,5,8.9),
+    (2,1,8.1),(2,4,6.0),(2,3,8.0),(2,6,8.4),(2,5,9.9),
+    (3,1,7.0),(3,6,7.5),(3,4,8.0),(3,3,7.1),(3,5,8.0),
+    (4,1,7.5),(4,3,7.8),(4,4,8.3),(4,2,7.6),(4,5,8.5),
+    (5,1,9.5),(5,3,9.0),(5,4,9.1),(5,2,9.3),(5,5,9.9),
+    (6,2,6.5),(6,3,7.8),(6,4,8.8),(6,2,8.4),(6,5,9.1),
+    (7,2,9.1),(7,5,9.7),
+    (8,4,8.5),(8,2,7.8),(8,6,8.8),(8,5,9.3),
+    (9,2,5.5),(9,3,6.8),(9,4,5.8),(9,6,4.3),(9,5,4.5),
+    (10,5,9.9),
+    (13,3,8.0),(13,4,7.2),
+    (14,2,8.5),(14,3,8.9),(14,4,8.9);
+
+# Start from basic joins, moving onto MANY to MANY:
+
+# 1. Link series with rating:
+SELECT title, rating FROM series JOIN reviews ON series.id = reviews.series_id;
+
+# 2. Link series with AVERAGE rating:
+SELECT title, AVG(rating) AS avg_rating FROM series JOIN reviews ON series.id = reviews.series_id GROUP BY series.id ORDER BY avg_rating;
+
+# 3. SELECT first_name, last_name, rating from reviewers JOIN reviews ON reviewers.id = reviews.reviewer_id;
+SELECT first_name, last_name, rating from reviewers INNER JOIN reviews ON reviewers.id = reviews.reviewer_id;
+
+# 4. FIND UNREVIEWED SERIES:
+# use LEFT JOIN to list all of the NULL reviews:
+SELECT title, rating FROM series LEFT JOIN reviews ON series.id = reviews.series_id ;
+SELECT title, rating FROM series LEFT JOIN reviews ON series.id = reviews.series_id WHERE rating is NULL ;
+
+# 5. Average ratings per Genre:
+select genre, AVG(rating) from series JOIN reviews ON series.id = reviews.series_id GROUP BY genre
+
+# 6. Reviewer stats (min/max/number/average) of all ratings:
+SELECT first_name,
+       last_name, 
+       Count(rating)                               AS COUNT, 
+       Ifnull(Min(rating), 0)                      AS MIN, 
+       Ifnull(Max(rating), 0)                      AS MAX, 
+       Round(Ifnull(Avg(rating), 0), 2)            AS AVG, 
+       IF(Count(rating) > 0, 'ACTIVE', 'INACTIVE') AS STATUS 
+FROM   reviewers 
+       LEFT JOIN reviews 
+              ON reviewers.id = reviews.reviewer_id 
+GROUP  BY reviewers.id; 
+
+# 6b. Use CASE statement and add "POWER USERS":  
+SELECT first_name, 
+       last_name, 
+       Count(rating)                    AS COUNT, 
+       Ifnull(Min(rating), 0)           AS MIN, 
+       Ifnull(Max(rating), 0)           AS MAX, 
+       Round(Ifnull(Avg(rating), 0), 2) AS AVG, 
+       CASE 
+         WHEN Count(rating) >= 10 THEN 'POWER USER' 
+         WHEN Count(rating) > 0 THEN 'ACTIVE' 
+         ELSE 'INACTIVE' 
+       end                              AS STATUS 
+FROM   reviewers 
+       LEFT JOIN reviews 
+              ON reviewers.id = reviews.reviewer_id 
+GROUP  BY reviewers.id; 
+
+# .7 MANY TO MANY - Join all series, with each review and reviewer (INNER JOIN - not concerned with NO review data):
+  select title, rating, first_name , last_name  from series 
+  JOIN reviews ON series.id = reviews.series_id 
+  JOIN reviewers ON reviews.reviewer_id = reviewers.id;
+
+
+#####
+
+
+
+
+
+
+# REPLCIATION
+
+MASTER: my.cnf
+	bind-address
+	server-id
+	log_bin
+	logbin_do_db
+
+restart mysqld
+
+create user:
+CREATE USER 'repl'@'%' IDENTIFIED BY 'password';
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';
+FLUSH PRIVILEGES;
+
+# create the database:
+CREATE DATABASE test1;
+CREATE TABLE customers(id INT AUTO_INCREMENT NOT NULL PRIMARY KEY, username VARCHAR(100));
+INSERT INTO customers(username) values ('bejen');
+
+# lock the tables:
+FLUSH TABLES WITH READ LOCK;
+
+# show position - note down position
+SHOW MASTER STATUS
+
+# now export the database as it currently stands from another window:
+mysqlsump -uroot -p --opt test1 >/tmp/test1.sql
+
+# unlock the tables back on original window:
+UNLOCK TABLES;
+
+# i inserted another user to make a difference;
+INSERT INTO customers(username) values ('chaya');
+
+# now configure slave:
+
+start mysql and create database;
+CREATE DATABASE test1;
+EXIT;
+
+# import the previously exported database into replica:
+mysql -uroot -p test1 < /tmp/test1.sql
+
+# modify my.cnf:
+my.cnf:
+server-id       = 2
+relay-log       = /var/log/mysql/mysql-relay-bin.log
+log_bin         = /var/log/mysql/mysql-bin.log
+binlog_do_db    = test1
+bind-address	= 172.18.0.3
+
+# at this point you should be able to see the database, table and the initial (bejen) entry in the table - but not the second!
+
+setup replica through mysql cli on slave:
+CHANGE MASTER TO MASTER_HOST='172.18.0.2', MASTER_USER='repl', MASTER_PASSWORD='password', MASTER_LOG_FILE='mysql-bin.000001', MASTER_LOG_POS= 1562;
+
+START SLAVE;
+SHOW SLAVE STATUS \G;
+
+# to skip any errors:
+SET GLOBAL SQL_SLAVE_SKIP_COUNTER = 1; START SLAVE; 
+
+
+
+
+
+###
+
+change user password:
+ALTER USER 'repl'@'%' IDENTIFIED BY 'pa55w0rd';

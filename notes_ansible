@@ -1,0 +1,1026 @@
+# ansible
+
+# steps:
+ansible makes ssh connection in parallel to each host
+and executes the first task only on all 3 hosts simultanuosly
+- generates python script, copies script to servers, executes on servers
+only after 1st task is complete on all hosts, it repeats for 2nd task
+
+tasks runs in order you specify them
+
+push based configuration management system
+
+thin later of abstraction - use apt/yum (instead of package, etc)
+
+# hosts (inventory)
+- hostname/alias/ip
+- create a hosts file:
+  testserver ansible_host=23.54.6.7 ansible_port=2222 ansible_user=ec2-user ansible_private_key_file=~/.ssh/aws.pem
+
+# test connection
+ansible testserver -i hosts -m ping -vvvv
+# -m is module
+# -i is the inventory file
+# -v verbose level
+
+# ansible.cfg (set defaults):
+# order for ansible to find file:
+  1. $ANSIBLE_CONFIG (var)
+  2. ./ansible.cfg (current dir)
+  3. ~/.ansible.cfg (home dir)
+  4. /etc/ansible/ansible.cfg (system)
+
+# good idea might be to place in current dir for version control
+
+# example for ./ansible.cfg:
+  [defaults]
+  inventory = hosts
+  remote_user = ec2-user
+  private_key_file = ~/.ssh/aws.pem
+  host_key_checking = false
+
+# default location for inventory is /etc/ansible/hosts
+# good idea might be to place in current dir for version control
+
+# now you can do:
+ansible testserver -m ping (without all the other options!)
+
+# commands module:
+ansible testserver -m command -a uptime
+# this is however the default module and therefore no need to specify it:
+ansible testserver -a uptime
+
+# as root user (-b)
+ansible testserver -b -a "cat /var/log/secure"
+
+# apt and service modules:
+ansible testserver -b -m apt name=nginx
+ansible testserver -b -m service -a "name=nginx state=restarted"
+
+# playbooks (script)
+# a list of "plays" which must include a set of hosts and list of tasks
+
+# optional settings:
+  name: 
+  become: (root user)
+  vars:
+
+# example:
+- name: configure webserver	# prints out name pf play in output
+  hosts: webservers		# inventory
+  become: True			# sudo
+  vars: 			# variables
+    key_file: /etc/nginx/ssl/nginx.key 
+    cert_file: /etc/nginx/ssl/nginx.crt
+    conf_file: /etc/nginx/sites-available/default
+    server_name: localhost
+  tasks:
+    - name: install nginx
+      apt: name=nginx update_cache=yes
+  
+    - name: create dir for ssl
+      file: path=/etc/nginx/ssl state=directory
+
+    - name: copy ssl key
+      copy: src=files/nginx.key dest={{ key_file }} owner=root mode=0600
+      notify: restart nginx
+
+    - name: copy cert
+      copy: src=files/nginx.crt dest={{ cert_file }}
+      notify: restart nginx
+      
+    - name: copy conf
+      template: src=templates/nginx.conf.j2 dest={{ conf_file }}
+      notify: restart nginx
+
+  handlers:
+    - name: restart nginx
+      service: name=nginx state=restarted
+
+# now you can include the variables within your template files
+# e.g. conf file:
+  server_name	{{ server_name }};
+
+# playbook tasks:
+  name:
+  apt: yum:
+  file: (linking, etc)
+  template:
+  service: 
+  copy:
+  notify:
+
+# ansible module documentation:
+ansible-doc <module>
+
+# inventory:
+# group servers with [group]
+[webservers]
+web1 ansible_host=1.2.3.4 ansible_port=22
+web2 ansible_host=5.6.7.8
+web2:2222 (can use this syntax also)
+web3 ansible_user=bejen
+
+# can then run ansible against all:
+ansible all -a "uname -a"
+anisble "*" -a "uname -a"
+
+# execute playbook:
+ansible-playbook install_webserver.yml
+
+# add shbang:
+#!/usr/bin/env ansible-playbook
+# then just execute the file:
+./install_webserver.yml
+
+
+# handlers:
+- handlers a re run at end of play
+- only run once (even if notified multiple times)
+- are run in the order they are defined in the handlers section (NOT the notification order)
+- most common uses are for restarting/rebooting, etc
+
+# describing servers:
+# behavioral invetory parameters (e.g. ansible_host) within ansible.cfg file
+ansible_host
+ansible_port
+ansible_user
+ansible_password
+ansible_connection (default transport (smart) which if local ssh client support feature "ControlPersist".  If not, then uses a python-based ssh clinet (Paramiko)
+ansible_private_key_file
+ansible_shell_type (default is bourne /bin/sh)
+ansible_python_interpreter (if using python2 or some other page on remote)
+ansible_*_interpreter (if not using python)
+
+# inventory
+- can have hosts on their own and also in groups
+- can have groups witin groups:
+  [webapp1:children]
+  webservers
+  databases
+  application_servers
+
+# can use wild cards:
+  web[1:20].example.com
+
+# can include variable for groups (of hosts):
+  [all:vars]			# all hosts
+  ntp_server.ntp.example.com
+
+  [production:vars]
+  db_primary_host=db1.example.com
+  mysql_user=root
+
+# alternatively keep vars within own grouped variable files (yaml format):
+# ansible looks for host variable files in directory called "host_vars"
+# ansible looks for group variable files in directory called "group_vars"
+# e.g.
+/playbook/host_vars/server1.example.com
+/playbook/group_vars/production
+
+# the variables files can contain dictionaries.  e.g.:
+/playbook/group_vars/production:
+db:
+    user: widget_user
+    password: desdfewfregrge
+    primary:
+      host: server1.example.com
+      port: 2789
+    replica:
+      host: server2.example.com
+      port: 2789
+
+rabbitmq:
+    host: server3.example.com
+
+# to access yaml dictories, need to use underscores e.g:
+{{ db_primary_host }}  (not db.primary.host)
+
+# use can also break group vars further into sections:
+/playbook/group_vars/production
+/playbook/group_vars/production/db
+/playbook/group_vars/production/rabbitmq
+
+# can also use dynamic inventory lists from external sources
+# e.g. can use EC2;s query API or command line tool awscli
+# or can use cobbler (foreman)
+# ansible will EXECUTE the dynamic host script (rather than reading it)
+# 2 options are mandatory: --list and --host=
+# the script should return the list of hosts/groups in JSONa
+# should return a "_meta" key for host variables in json
+
+
+# to avoid duplication between local hosts file and external, you need to mark the local as executable to mark it as dynamic - ansible will then execute it rather than reading it
+
+# dynamic hosts
+./dynamic.py --host=web1.example.com (get details of behavioural variables)
+./dynamic.pl --list (get list of all - grouped in groups)
+# output of above is in json
+# read book to learn how to write a vagrant dynamic script
+
+# to use dynamic, the ansible.cfg should read
+  [defaults]
+  inventory = inventory
+# the above will look for the "directory" and merge multiple invesntory files
+# or specify with the -i option on command line
+
+# add host entries during run time (does not add to inventory):
+add_host name=server1.example.com groups=web,staging myvar=myvar
+# in playbook (as host inventory is read in beginning, the new "dynamic" host might not yet have been recognised):
+tasks:
+  - name: add host
+    add_host: >
+        name=server1.example.com
+        ansible_port=2222
+
+# add groups during execution of playbooks (group_by)
+# group hosts by "facts"
+e.g.
+  - name: create group based on distribution
+    hosts: myhosts
+    gather_facts: True
+    tasks:
+      - name: create groups
+        group_by: key={{ ansible_distribution }}
+  - name: do something to ubuntu hosts
+    hosts: Ubuntu
+    tasks:
+      - name: whatever
+ 
+  - name: do someting to redhat hosts
+    hosts: Redhat
+    tasks:
+      - name: whatever
+
+# variables and facts
+
+# can also put variables in a file (instead of top of playbook):
+vars_files:
+  - nginx.yml
+
+nginx.yml:
+key = nginx.key
+crt = nginx.crt
+
+# debugging - output the variable result:
+- debug: var=myvarname
+
+# register variable:
+- name: capture whoami
+  command: whoami
+  register: mylogin
+- debug: var=mylogin
+ 
+# "changed" status is always "1" for command and shell modules
+# unless overidden by the "changed_when" clause
+
+# stdout is output as a single string
+# stout_lines is output lines as a list
+
+# its useful to do something from a failed task.  however if a task fails, ansible stop executing.  therefore you can use the ignore_errors clause - so ansible doesnt not stop on errors:
+- name run program
+  command: /usr/bin/someScript.sh
+  register: result
+  ignore_errors: True
+- debug: var=result
+
+# access variable within dictionary:
+{{ login.stdout }}
+{{ login['stdout'] }}
+{{ ansible_eth1['ipv4']['address'] }}
+{{ ansible_eth1['ipv4'].address }}
+
+# facts:
+# get all facts:
+ansible server1 -m setup
+# - the returned value is a dictionary with the key being "ansible_facts"
+
+# filter facts:
+ansible ansible_client1 -m setup -a 'filter=ansible_eth0'
+
+# ec2 facts module:
+ansible <server> -m ec2_facts
+
+# from playbook:
+- name: get ec2 facts
+  hosts: webservers
+  tasks:
+    - name: get ec2
+      ec2_facts:
+    - debug: var=ansible_ec2_instance_id  
+
+# local facts - place on remote machines /etc/ansible/fact.d/ directory
+# has to be an ini or json format file:
+/etc/ansible/facts.d/example.facts:
+[book]
+title=Ansible Notes
+author=Bejen Shah
+publisher=O'Rielly
+
+- name: test local variables
+  hosts: ansible_client1
+  tasks:
+    - name: print ansible_local
+      debug: var=ansible_local
+    - name: print book title
+      debug: msg="title is {{ ansible_local.example.book.title }}"
+
+# above, example is the file name!
+# ansible_local is the name of dictionary with the key "example"
+
+# set_fact
+# set a fact (after register) - same thing really as defining a new variable
+- set_fact: myvar={{ var.name }}
+
+# built-in variables (examples):
+hostvars
+- variables defind within groups config are actually applied to each host
+- to use hostname from one host to another: 
+  {{ hostvars['db.example.com'].ansible_eth1.ipv4.address
+
+investory_hostname
+- hostname of host - as known by ansible (var=hostvars[inventory_hostmame]
+# get a list of all vars on control machine
+- debug: var=hostvars[inventory_hostname]
+inventory_hostname_short
+groups
+- useful to access variable to user group
+# e.g.
+backend web-backend
+{% for host in groups.web %}
+  server {{hostvars[host].inventory_hostname }} \
+  {{ hostvars[host].ansible_default_ipv4_address }}:80
+{% endfor %}
+
+group_names:
+ansible_check_mode
+ansible_play_hosts
+ansible_version
+
+# cat variables within debug mode
+- debug = hostvars[host].inventory_hostname
+
+set variables on command line:
+# playbook:
+  vars:
+    greeting: "this is the playbook message"
+  tasks:
+    debug: msg="{{ greeting }}"
+
+# variables set from command line with the -e option have highest precedence
+ansible-playbook greet.yml -e 'greeting="this is new message"'
+
+# get variables from a file:
+ansible-playbook greet.yml -e @greetvars.yml
+
+#(entire parameter should be in single quote if space is required)
+
+# precedence of variables:
+1. ansible-playbook -e var=value
+2. task vars
+3. block vars
+4. role and include vars
+5. set_fact
+6. registered variables
+7. var_files
+8. vars_prompt
+9. play varibles
+10. host facts
+11. host_vars (set in playbook)
+12. group_vars (set on playbook)
+13. host_vars set in inventory
+14. group_vars set in inventory
+15. inventory variables
+16. defaults/main.yml of a role
+
+### random examples ###
+
+# list of tasks within playbook:
+ansible-playbook --list-tasks myplay.yml
+
+# with_items iteration to install multiple packages:
+- name: install packages
+  apt: pkg=(( item }} update_cache=yes cache_valid_time=3600
+  with items:
+    - git
+    - nginx
+    - php5
+
+# using the above method, apt will attempt to install all at same time
+# other package modules (ie. pip) may not as its not supported
+
+# add become: True within task (not whole playbook) if necessary
+#
+
+# git check-out module
+- name: check out repo
+  git: repo={{ repo_url }} dest={{ proj_path }} accept_hostkey=yes
+
+# enable ssh agent forwarding in ansible.cfg:
+# ansible.cfg:
+[ssh_connection]
+ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o ForwardAgent=yes
+# confirm with:
+ansible web_server1 -a "ssh-add -l" # should include the public key
+
+# python / pip installs
+# install python packages in isolated environment (virtualenvs)
+# can create multiple virtualenvs without root access
+
+- name: install python and virtualenvs
+  pip: name={{ item }} state=latest
+  with items:
+    - pip
+    - virtualenv
+    - virtualenvwrapper
+  become: True
+
+# requirements.txt is a common practise to specify dependencies in a file
+- name: name: install requirements.txt
+  pip: requirements={{ proj_path }}/{{ reqs_path }} virtualenv={{venv_path }}
+
+- name: install python packages
+  pip: name={{ item }} virtualenv={{ venv_path }}
+  with_items:
+    - gunicorn
+    - django-compressor
+
+# requirements.txt will for example list the following:
+Mezzaine==4.2.2
+
+# we could have added all the packages in requirement.txt, 
+# or could have added all the packages in pip module
+# and can also add versions to all packages
+
+# use "pip freeze" command to list allpackages in virtualenv:
+source ~/.myProject/bin/activate
+pip freeze > requirements.txt
+
+# can also pass the packages and versions as a list with with_items:
+with_items:
+  - {name: mezzanine, version: 4.2.2 }
+  = {name: gunicorn, version: 19.6.0 }
+
+# can also break lines using YAML folding:
+- name: install packages
+  pip: >
+    name={{ item.name }}
+    version={{ item.version }}
+    virtualenv:{{ venv_path }}
+
+###################################
+
+# database (configure as root, and then db user):
+- name: create DB user
+  postgres_user:
+    name: "{{ db_user }}"
+    password: "{{ db_passed }}"
+    become: True;
+    become_user: postgres
+
+# sudo
+- name: restart nginx
+  service: nginx state=restarted
+  sudo: True
+
+# cron
+- name: enable cron job
+  cron: name="restart nginx" minute="*/5" user={{ user }} job="{{ manage }}
+
+# to remove cron:
+ - name: remove cron
+   cron: name="restart nginx" state=absent
+
+###################################
+#
+# tips - template logics:
+server_name {{ domains|join(", ") }};
+# the above snippet expects a list for the variable domains - and generates a string with all elements of domains connected together, sperated by commas
+#
+# domains:
+#   - 192.169.122.2
+#   - www.google.com
+# 
+# result in template file:
+# server_name 192.168.122.2, www.google.com;
+#
+#
+# tips: "if" within templates:
+#
+{% if tls_enabled %}
+ssl_certificate
+conf/{{ proj_name }}.crt;
+ssl_certificate_key conf/{{ proj_name }}.key;
+{% endif %}
+
+# then you can have the following clause in TASK:
+- name: aensure config path exists
+  file: path={{ conf_path }} state=directory
+when: tls_enabled
+
+# in the below example, chdir and create are parameters which are passed to the module (command) - NOT the command line
+command: >
+  openssl req -new -x509 -nodes -out {{ proj_name }}.crt
+  -keyout {{ proj_name }}.key -subj '/CN={{ domains[0] }}' -days 3650
+  chdir={{ conf_path }}
+  creates={{ conf_path }}/{{ proj_name }}.crt
+
+# so use the above if you want to run the command only if the file is not present!
+
+###################################
+# roles:
+#
+# break playbooks into roles for each type of host
+# e.g. a role for databases and apache servers
+subdirectories within the 'roles' directory including:
+tasks, failes, templates, handlers, vars, defaults, meta
+vars: variables that shouldnt be overidden
+defaults: default variables that CAN be overidden
+meta: dependency information about a role
+
+main.yml within each subdirectory is the main and first default file
+
+ansible looks for roles directory alongside the playbooks directory.
+also system-wide toles within /etc/ansible/roles - this can be customised in ansible.cfg:
+[defaults]
+roles_path = ~/ansible_roles
+
+- can also overide with $ANSIBLE_ROLES_PATH environment variable
+
+# include the roles in the playbook:
+- name deply mezzanine
+  hosts: web
+  roles:
+  - role: database
+    database_name: "{{ project_name }}"
+
+# the above variables within the playbooks - passed to the role - overide the ones in vars/main.yml and defaults/main.yml
+
+# pre-tasks and post-tasks
+# to define tasks before and after the role:
+
+playbook:
+- name: deploy app
+  hosts: web
+  vars_files:
+    - secrets.yml
+  pre-tasks:
+    - name: update cache:
+      apt: update_cache=yes
+  roles:
+    - role: database
+      database_host: {{ project_name }}
+  post-tasks:
+    - name: send email
+      mail: x.x.x.x.x
+
+#########
+
+the main.yml within each role subdirectory is the same as the playbook, with otu leading lists. example of tasks role will simple start with the first task:
+- name: install postgress
+  yum: name=postgress
+
+# when ansible first introduced roles, there was only 1 place to define role variables - within vars/main.yml.  variables wihtin here havea  higher precedence than those defined in the vars section of the play.  this means the variables could not be overidden unless specified with the "-e" option .
+# then later they instrduced the defafult/main.yml (to allow it to be overideen form another variable within plays.
+
+# add variable names with the role name as prefix is a good idea - i.e. apache_username.  As ansible does not have any notion of namespace across roles - so its easier to identify and prevent duplications, etc.
+
+keep variables within vars/main.yml
+
+keep default vaues within defaults/main.yml - maybe do not prefix these with role name as they might be overidden.
+i.e. tls_enabled: True
+
+# break up main.yml - example 
+main.yml:
+- include dyanjo.yml
+
+# ansible automatically looks within files/ and templates/ so dont include these subdirectories within the module src.
+
+# ansible-galaxy
+# main purpose is to download roles from online repository
+# but can also use for scaffolding to generate files/directories:
+
+ansible-galaxy init -p playbooks/roles newrole
+# above creates a new directory newrole
+
+# dependencies
+# use if multiple roles have a single dependency role requirement
+# no need to configure role mutiple times (within each role) - duplication
+# no need to setup new tole and then apply to each role (might forget)
+# what we need is the role to be always applied to the existing role
+# so we difne it through 'dependencies' within each role:
+
+# create a new role:
+roles/ntp
+# include it in the existing roles meta yml:
+roles/web/meta/main.yml:
+dependencies:
+    - { role: ntp, ntp_server=ntp.ubuntu.com }	# allows parameters to be set
+    - { role: memcached }			# multiple dependencies
+
+
+# ansible-galaxy
+# use to explore existing roles, etc
+# installs to ~/.ansible/roles by default
+# meta/.galaxy_install_info contains some installation info on the role
+
+# ansible-galaxy list			# list installed roles
+# ansible-galaxy remove <name> 		# remove installed roles
+#
+# contents of roles re actually stored in github
+
+##############################################################
+#                                                            #
+# additional features (taken from chapter: complex playbooks #
+#                                                            #
+##############################################################
+
+# changed_when & failed_when
+- when modules are not idempotent, we can do this:
+ - first understand the output status when first run and second time run
+ - (this can fail if the second task of configuring httpd.conf fails to restart the server, etc)
+# capture output:
+- add 'register' to save output
+- add 'failed_when: False' to prevent playbook from stopping execution
+- add 'debug' to print the variable of the registered value
+- add 'fail:' to stop playbook execution
+- example:
+
+- name: initialize the database
+  django_manage:
+    command: createdb --noinput --nodata
+    app_path: "{{ proj_path }}"
+    virtualenv: "{{ venv_path }}"
+  failed_when: False
+  register: result
+- debug: var=result
+- fail:
+
+# add 'changed_when' clause with the results stdout
+changed_when: '"Creating tables" in result.out'
+
+# add an 'OR' statement if results are in different variables:
+changed_when: result.out is defined and '"Creating tables" in result.out'
+# or:
+changed_when: '"Creating tables" in result.out|default("")'
+# 
+# filters:
+# part of the jinga2 templating engine - can use in templates and playbooks
+# inside '{{ braces }}'
+# ansible provides default filters to augment the jinga2 filters:
+
+# provide a default: 
+"HOST": "{{ database_host | default('localhost') }}"
+
+# fail execution for host if task fails:
+- name: Run myprog
+  command: /opt/myprog
+  register: result
+  ignore_errors: True
+- debug: var=result
+- debug: msg="Stop running the playbook if myprog failed"
+  failed_when: result|failed
+
+# other options:
+failed_when: result|changed
+failed_when: result|success
+failed_when: result|skipped
+
+# file path filters:
+basename
+dirname
+expanduser (replace dir with home dir)
+realpath (conanical path (resolves symbolic links))
+# example:
+vars:
+  homepage: /usr/share/nginx/html/index.html
+tasks:
+  - name: copy home page
+    copy: src=files/{{ homepage | basename }} dest={{ homepage }}
+# (replaced src full path with the 'basename# of 'homepage')
+
+# join (loop around variables):
+# the below would not quote the domainnames
+ALLOWED_HOSTS = [{{ domains|join(", ") }}]
+# this quotes the domainnames but we need to define "surround_by_quote"
+ALLOWED_HOSTS = [{{ domains|surround_by_quote|join(", ") }}]
+# ansible looks for custom filters within playbooks/filter_plugins directory
+# example - filter_plugins/surround_by_quotes.py:
+def surround_by_quote(a_list):
+    return ['"%s"' % an_element for an_element in a_list]
+class FilterModule(object):
+    def filters(self):
+         return {'surround_by_quote': surround_by_quote}
+
+# You can also place filter plugins in the 
+# ~/.ansible/plugins/filter directory, 
+# or the /usr/share/ansible/plugins/filter directory,
+# ANSIBLE_FILTER_PLUGINS environment variable
+
+# lookups:
+# you can define variables in multiple places:
+# vars (playbooks), var_files (files), host_vars/group_vars (directories)
+# ansible lookup allows you to 'look up' variables from outside source:
+# text file, csv, file, etc.  
+# allows you not to keep a duplication of variables/values
+#
+# supported sources:
+# file (from a file)
+lookup('file', '/path/to/file.txt')
+
+- name: Add my public key as an EC2 key
+  ec2_key: name=mykey \
+           key_material="{{ lookup('file', '/User/lorin/.ssh/id_rsa.pub') }}"
+
+  # in template:
+  {{ lookup('file', '/Users/lorin/.ssh/id_rsa.pub') }}
+
+# password (randomly generated)
+- name: create deploy postgres user
+  postgresql_user:
+  name: deploy
+  password: "{{ lookup('password', 'deploy-password.txt') }}"
+  # write the password to the file deploy-password.txt
+  
+# pipe (output of a locally executed command)
+- name: get SHA of most recent commit
+  debug: msg="{{ lookup('pipe', 'git rev-parse HEAD') }}"
+# env (environmental variable)
+- name: get the current shell
+  debug: msg="{{ lookup('env', 'SHELL') }}"
+# template (jinga2 template after evalation)
+# csvfile
+lookup('csvfile', 'sue file=users.csv delimiter=, col=1')
+  # dont specify a name for the first (column 0) to the lookup plugin
+lookup('csvfile', username + ' file=users.csv delimiter=, col=1')
+  # if the username was in a variable called 'username'
+  
+# dnstxt
+debug: msg="{{ lookup('dnstxt', 'ansiblebook.com') }}"
+
+# redis_kv
+debug: msg="{{ lookup('redis_kv', 'redis://localhost:6379,weather') }}"
+
+# etcd
+debug: msg="{{ lookup('redis_kv', 'redis://localhost:6379,weather') }}"
+
+# custom lookup plugins
+# stored in ~/.ansible/plugins/lookup, /usr/share/ansible/plugins/lookup
+# or $ANSIBLE_LOOKUP_PLUGINS
+# check documentation for further information
+
+# loops
+# with_items: (loop over list elements)
+- name: Install core packages required for Jenkins
+    yum: pkg={{item}} state=latest
+    with_items:
+      - git
+      - docker
+
+# with_lines: (loop over lines on command output)
+- name: send message
+  slack:
+    domain: example.slack.com
+    msg: "{{ item }} was in the list"
+  with_lines:
+    - cat files/names.txt
+
+# with_fileglob: loop over set of files (example - search and add)
+- name: add pub keys
+  authorized_key: user=deploy key="{{ lookup('file', item) }}"
+  with_fileglob:
+    - /var/keys/*.pub
+
+# with_dict: (iterate over dictionary instead of lists)
+# the 'item' loop variable is a dictinary with 2 keys:
+# key and value
+- name: iterate over ansible_eth0
+    debug: msg={{ item.key }}={{ item.value }}
+    with_dict: "{{ ansible_eth0.ipv4 }}"
+
+# many more loop mechanisms available - read documentation
+
+# loop controls:  *** read up on this ***
+#
+#
+# Includes
+- include: Redhat.yml
+  when: ansible_os_family == 'Redhat'
+
+# Role includes
+- name: install tomcat
+  include_role:
+    name: apache
+
+# can include specific tasks from the role:
+include_role:
+  name: apache
+  tasks_from: apply_crt
+
+# block clauses - *** read up on this ***
+
+
+# ansible vault - encrypts passwords in the vault file
+# ansible-vault encrypt secret.yml
+# ansible-vault create secret2.yml
+# uses $EDITOR to open up a password file, etc
+# to read use 'vars_file' the same way and then provide password in playbook:
+ansible-playbook myplay.yml --ask-vault-pass
+anisble-playbook myplay.yml --vault-password-file ~/.password.txt
+# if the password file is executable (above), then ansible will execute it
+# and use the contents of standard out as the vault password (to script)
+
+# customizing hosts, runs and handlers
+
+hosts: web		# group
+hosts: all 		# patterns
+hosts: dev:staging	# multiple groups
+host: dev:&database	# intersection - all database servers in dev group
+
+# regular expressions (start with '~'):
+all			*
+exclusion 		!dev
+wildcards		*.example.com
+range			web[5:10]
+regular expressions	~web\d+\.example\.(com|org)
+combinations		dev:staging:$databasea:!queue
+
+# limit hosts
+ansible-playbook -l hosts playbook.yml
+ansible-playbook --limit hosts playbook.yml
+ansible-playbook --limit 'staging:&database' playbook.yml
+
+# local_action: run on control machine
+- name: wait for ssh server to be running
+  local_action: wait_for port=22 host="{{ inventory_hostname }}"
+  search_regex=OpenSSH
+
+# delegate_to:
+# run task on a different host (example - enable host-based alert on nagios)
+- name: enable alerts
+  hosts: web
+  tasks:
+    - name: enable alerts
+      nagios: action=enable_alerts service=web host={{ inventory_hostname }}
+      delegate_to: nagios.example.com
+
+# in the above example, ansible will execute the task on the nagios server
+# but the inventory_hostname would evaluate to the web host on control
+
+# serial: run on 1 host at a time (default is parrallel)
+- name: upgrade packages behind load balancer
+  hosts: web
+  serial: 1
+  tasks:
+# serial '1' runs on 1 host at a time, ansible will not continue to run tasks on the remaining hosts is this fails.
+# serial '2' would run on 2 hosts at a time, etc
+max_fail_percentage: 25	# provide a % of failed hosts for ansible to stop
+serial: 50%		# run on 50% of hosts
+serial:
+  - 1			# first run on 1
+  - 30%			# then run on 30%
+
+# run_once:  (run a task only once even if multiple hosts)
+- name: run upgrade
+  command: /myscript.sh
+  run_once: true
+
+# above can be useful with local_action
+- name: run script
+  local_action: command myscript.sh
+  run_once: true:w!
+
+# running strategies
+# include a sleep in the hosts file:
+example1.google.com sleep_secs=1
+example1.google.com sleep_secs=5
+example1.google.com sleep_secs=6
+
+# then use that in playbook:
+- hosts: all
+  tasks:
+  - name: first task
+    shell: sleep "{{ sleep_secs }}"
+
+# free: (dont wait for all tasks to complete on all gists
+- hosts: all
+  strategy: free
+  
+# advanced handlers (execute as part of pre and post tasks)
+- hosts: all
+  pre_tasks: whatever
+  notify: print message
+
+  tasks: whatever
+  notify: print message
+
+  post_tasks: whatever
+  notify: print message
+
+# setup: gather facts later
+- name: gather facts
+  setup:
+
+
+# callback plugins
+
+# ansible
+
+# steps:
+ansible makes ssh connection in parallel to each host
+and executes the first task only on all 3 hosts simultanuosly
+- generates python script, copies script to servers, executes on servers
+only after 1st task is complete on all hosts, it repeats for 2nd task
+
+tasks runs in order you specify them
+
+push based configuration management system
+
+thin later of abstraction - use apt/yum (instead of package, etc)
+
+# hosts (inventory)
+- hostname/alias/ip
+- create a hosts file:
+  testserver ansible_host=23.54.6.7 ansible_port=2222 ansible_user=ec2-user ansible_private_key_file=~/.ssh/aws.pem
+
+# test connection
+ansible testserver -i hosts -m ping -vvvv
+# -m is module
+# -i is the inventory file
+# -v verbose level
+
+# ansible.cfg (set defaults):
+# order for ansible to find file:
+  1. $ANSIBLE_CONFIG (var)
+  2. ./ansible.cfg (current dir)
+  3. ~/.ansible.cfg (home dir)
+  - 1 log per host
+  - path is not configurable
+  - might prefer 'log_path' which is similar but also configurable
+    [defaults]
+    log_path = /var/log/ansible.log
+
+- profile_tasks	show summary of execution time of all individual tasks
+- timer		show total execution time (profile_tasks might be prefered)
+
+# ansible - further management
+
+# ssh multiplexing and ControlPersist
+- optimise ssh connections to open a single socket for the same host
+
+# pipelining
+- execute python script through ssh (rather than copying
+
+# fact caching
+- only gather facts which are not in cache or expired, etc
+- based on json file, redis or memcached
+
+# parallelism
+- ansible does not actually connect to ALL hosts in parallel
+- default is 5; set by:
+  - export $ANSIBLE_FORKS=20
+  - [defaults]
+    forks = 20
+
+# concurrent tasks with async
+- start additional tasks before the previous ones are completed
+
+
+# custom modules
+- *** read this ***
+
+# check mode (dry run)
+-C / --check options in ansible-playbook
+
+# debug
+- debug callback for a human friendly output
+- ansible-playbook -vvvv (view arguments being passed through SSH)
+- debug module
+  - debug: msg=var= {{ var }}
+- playbook debugger
+  - interactive debugger
+    - name: whatever
+      stategy: debug
+      tasks:
+  - further options available for this
+
+- assert module: errors if a condition is not met
+- syntax check:
+  ansible-playbook --syntax-check playbook_file.yml
+
+- list tasks:
+  ansible-playbook --list-tasks playbook_file.yml
+
+- check mode (dry run)
+  ansible-playbook -C playbookfile.yml
+  ansible-playbook --check playbookfile.yml
+
+- diff:
+  - differences for any files that are changed on remote machine
+  - use with --check to show how ansible would change the file
+    ansible-playbook --diff/-D --check playbook_file.yml
+
+- limit task run
+  --step allows you to skip each task sequentially
+  ansible-playbook --step playbook_file.yml
+

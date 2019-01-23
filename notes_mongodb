@@ -1,0 +1,273 @@
+mongodb:
+- nosql
+- written in c++
+- uses memory to store working set of data
+- database (physical container for collection, similar to database in mysql)
+  - each database gets its own configuration files in file system
+- collection - group of mongodb documents
+  - (similar to rdbms tables)
+  - do NOT enforce a schema
+- document - set of key-value pairs
+  - documents have dynamic schema
+  - (similar to rdbms rows)
+- mongo fields - rdbms columns
+- embedded documents - rdbms table joins
+- primary key _id (default) provided by mongodb
+  - 12 bytes hexadecimal number unique to every document
+  - 4 bytes for current timestamp
+  - 3 bytes for machine id
+  - 2 bytes for process id
+  - 3 bytes for simple incremental value
+- daemon is mongod
+- client is mongo
+- data is stored as json style documents
+
+
+- service mongodb stop|start|restart
+
+- help: mongo>db.help()
+- stats: mongo>db.stats()
+
+- create database
+  - use travelodge (cretes automatically)
+db (show current db)
+show dbs (show all dbs - at least 1 document must exist in db to show list)
+db.travelodge.insert({name: "hotels"}) (insert document into new db.  if new db has not been created, then collection will be stored in the default "test" db
+db.dropDatabase() (drop (current) db); will drop "test" if you are not in any
+
+- createCollection(name, options)
+  - options (memory size and indexing configuration):
+    - capped (fixed size which overwrites oldest entries when max is reached)
+    - autoIndexId (automatically create index on _id field - default is false)
+    - size (max size for capped (above))
+    - max (max number of documents for capped (above))
+  - example:
+    db.createCollection("customers", {capped: true, autoIndexId: true, size: 1024, max: 3})
+    - (the forth entry will remove the first)
+
+- db.customers.drop() (must be in database)
+
+- mongodb datatypes:
+  - string, integer, boolean, double (floating point), min/max keys, arrays, timestamp, objects (embedded documents), null, symbol (egenrally reservied for symbol in languages), object ID, binary data, code (JavaScript), regular expression
+
+
+- db.customers.insert() (insert document into collection)
+  - entire key/value within (), but each row within {}, arrays within []
+  - example: db.customers.insert([{name: "vinal", age: 20}, {name: "puja", age: 40, interests: [{music: "blues", sports: "netball"}]}])
+
+  - db.customers.save (can also use the "save()" function - same as above
+
+- mongo travelodge --eval "db.customers.find()" (get values from cli)
+
+- querying
+  - find(): db.customers.find() (returns non-structured)
+  - pretty(): db.customers.find().pretty() (returns in formatted way)
+  - findone(): only returns one document (first it finds)
+ 
+- conditions within queries
+  - equal:	db.customers.find({name: "bejen"}) 
+  - less than:	db.customers.find({age: {$lt:30}})
+  - less than equal: $lte
+  - $gt, $gte
+  - not equal to: $ne
+  - or: db.customers.find({$or: [{age: 20}, {name: "bejen"}]})
+  - and AND or: db.customers.find ({age: 20, $or: [{name: "bejen"}, {name: "chaya"}]})
+  
+  - can add the functions to .pretty()
+
+- update() (update document (overwite values))
+  - db.customers.update({name: "bejen", age: 50})
+    db.customers.update({name: "bejen"}, {$set: {age: 50}})
+    (cannot add NEW fields with update())
+    db.customers.update({name: "bejen"}, {$set: {age: 50}}, {multi: true}) (for multiple)
+- save() (replaces existing document)
+  db.customers.save({name: "bejen"}, {$set: {sex: "male"}}) (all previous values removed)
+
+- remove document: db.customers.remove({name: "bejen"})
+  db.customers.remove({name: "bejen"},1) (remove only once)
+  db.customers.remove() (all documents removed which you dont specify a criteria)
+
+- projection - limit the number of fields in find()
+      db.customers.find({}, {surname: 1}) 	(find all documents)
+  - find all with surname "shah" but only return the surnam field:
+      db.customers.find({surname: "shah"}, {surname: 1})
+
+- limit() - limit to 2 documents:
+  - db.customers.find().limit(2) 
+
+- skip() - skip the numbered document:
+    limit the find to 2 documents - after skipping the first
+    - db.customers.find().limit(2).skip(1)
+
+- sort() - 
+    ascending: db.customers.find().sort({"firstname":1}
+    descending: db.customers.find().sort({"firstname":-1}
+
+- ensureIndex()
+  - index fields for mongo to store data set fields to return results more effiently
+    db.customers.ensureIndex({firstname:1})
+    - multiple parameters withn ensureIndex():
+      - background (build index in background); default: false
+      - unique (unique values only in index; default: false)
+      - name (name of index); default: concatenation of indexed fields and sort number)
+      - dropDups (only index the first field and removed duplicate field documents)
+      - sparse (index only references documents with specific field - uses less space)
+      - expireAfterSeconds (TTL for document retain in collection)
+      - v (index version number)
+      - weights (significant of fields compared to other index fields)
+
+*** - aggregate() - process records and return completed results
+  - TBC********************
+
+- replication:
+  - a group of mongod instances that host the same data set
+  - 1 primary node, multiple secondaries
+  - all data replicates from primary to secondary
+  - elections established primary at failover times
+  - a recovered node automatically joins as secondary node
+  - any node can become primary
+  - all write operations go to primary
+  - automatic failover and recovery
+  - limitation to 12 nodes
+
+  - convert an existing standalone mongodb to replica set:
+    - service mongod stop
+    - start mongod with the "replSet" option:
+      - mongod --port "PORT" --dbpath "DATA_PATH" --replSet "REPLICA_SET_INSTANCE_NAME"
+    - connect to mongod instance with mongo command line
+    - within mongo client, initiate the new replica set:
+      - rc.initiate()
+    - to check replica set configuration, and status:
+      - rs.conf()
+      - rc.status()
+
+  - add new member to replica set:
+    - add instance from mongo client on master server:
+      - rc.add("HOST:PORT")
+  
+  - check whether you are connected to primary or secondary:
+    - db.isMaster()
+
+- sharding:
+  - store data records across multiple machines (demand growth)
+  - horizontal scaling
+  - shards store the data, provide high availability and data consistance
+  - each shard is a seperate replica set
+  - config servers - store clusters metadata
+    - contains mapping of clusters data set to shards
+  - query routers - mongo instances, interface with client application and direct operations to the shards
+    - clients send requests to query routers
+
+- backup:
+    - mongodump command - dumps entire data
+    - options:
+      --host <hostname>
+      --port <port>
+      --dbpath <dir>
+      --out <dir> (backup directory)
+      --collectino <collection_name> --db <db_name>
+
+- restore:
+  - # mongorestore
+
+- monitoring:
+    - mongostat:
+      - status of all running mongod instances
+      - returns counters of database operations
+      - counters include inserts, queries, updates, deletes, cursors
+      - shows page faults, lock percentages (for low memeory/performance issues)
+      - mongotop
+
+- java:
+  - install java and jdbc driver to update through java:
+  - browse through following link on tutorial on how to update/delete documents, etc
+      https://www.tutorialspoint.com/mongodb/mongodb_java.htm
+
+- php:
+  - browse through following link on tutorial on how to update/delete documents, etc
+      https://www.tutorialspoint.com/mongodb/mongodb_php.htm
+
+- relationships:
+  - relationships between documents
+  - relationships can be embedded or referenced
+  - 1:N - 1 to many (e.g. one user can have multiple addresses)
+    - 2 documents for users and address
+
+  - embedded approach (single document):
+     {
+       "_id":ObjectId("52ffc33cd85242f436000001"),
+       "contact": "987654321",
+       "dob": "01-01-1991",
+       "name": "Tom Benzamin",
+       "address": [
+          {
+             "building": "22 A, Indiana Apt",
+             "pincode": 123456,
+             "city": "Los Angeles",
+             "state": "California"
+          },
+          {
+             "building": "170 A, Acropolis Apt",
+             "pincode": 456789,
+             "city": "Chicago",
+             "state": "Illinois"
+          }
+       ]
+    } 
+ 
+    - retrieve just the address field:
+      db.users.findOne({"name":"Tom Benzamin"},{"address":1})
+
+    - embedded relationships allows retrieval within single query - makes it easy
+    - however, document can grow very large in size impacting performance
+
+  - referenced relationships (manual relationships):
+    - first document contains field to represent second document value:
+      {
+        "_id":ObjectId("52ffc33cd85242f436000001"),
+        "contact": "987654321",
+        "dob": "01-01-1991",
+        "name": "Tom Benzamin",
+        "address_ids": [
+           ObjectId("52ffc4a5d85242602e000000"),
+           ObjectId("52ffc4a5d85242602e000001")
+        ]
+     }
+
+  - DBRefs - reference data from different collections:
+    - db.users.update({first_name: "chaya"}, {$set: {home_address: {$ref: "address", $id: ObjectId("5b87b620f73eecd0d4007118"), $db: "travelodge"}}})
+    - db.users.insert({first_name: "aimee", home_address: {$ref: "address", $id: ObjectId("5b87b620f73eecd0d4007118"), $db: "travelodge"}})
+      - $ref is name of collection
+      - $id is the ID
+      - $db is the database name
+  ******* NOT SURE HOW TO QUERY THE TARGET dbRef ******
+
+- covered query:
+  - where all fields in query are part of an index
+  - all results from queriy are in the same index
+  ** we will not cover this
+
+- analysing queries:
+  - $explain:
+    - provides info on query, indexes used and other statistics
+    - shows how well the indexes are optimised
+    - first create index:
+      - db.users.ensureIndex({first_name:1, last_name: 1})
+    - now run $explain
+      - db.users.find({first_name: "bejen"}.explain()
+
+
+- findAndModify - update only if found
+  - db.users.findAndModify( { query: {first_name: "bejen"}, update: { age: 42} } )
+
+- getTimestamp - when object was created:
+  - ObjectId("5b87b5d4f73eecd0d4007117").getTimestamp()
+
+- Text Search
+  - enable ensureIndex on "text":
+    - db.users.ensureIndex({first_name:"text"})
+  - issue a search:
+    - db.users.find({$text: {$search:"chaya"}})
+
+- regular expressions:
+

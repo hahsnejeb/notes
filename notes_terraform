@@ -1,0 +1,113 @@
+- create configuration file (ends with .tf_
+example.tf
+
+- initialise terraform:
+init
+
+- apply configuration file:
+apply
+
+- show
+show
+
+- variables
+variables.tf (filename can be anything with .tf)
+define as "${var.secret_key}"
+
+overide variables: 
+- cli: -var 'access_key=foo'
+- file: terraform.tfvars in current dir
+  this auto load - as well as other files ending *.auto.tfvars
+- a different named file can be specified as -var-file argument
+
+- variables: TF_VAR_acces_key
+
+
+- prompted for values if not specified - (only string,
+  and not list or maps)
+
+- can use 'default' key to specify a default
+
+- maps:  create variables that are lookup tables - example
+  variable "AMIs" {
+    type = "map"
+    default = {
+      "us-east-1" = "ami-fj48349"
+      "us-west-2" = "ami-few94we"
+    }
+  }
+
+  - in configuation: 
+    ami = "${lookup(var.AMIs, var.region)}"
+
+
+
+###
+
+# configuration
+
+# load order and semantics
+- all config files loaded in alphabetic order
+- filenames must end with .tf or .tf.json (others ignored)
+- exception are overide files
+- all config files are appended to each other (not merged)
+- variable order do not matter
+
+# syntax
+- comments with '#'
+- multiline comments with /* */
+- white spaces are ignored
+- strings are double quoted
+- variables in ${}
+- boolean values are 'true', and 'false'
+- maps with {} and ':' - {"foo": "bar", "bax": "value"}
+- quotes required if key begins with a number
+
+# interpolcation
+- wrapped in ${}, ${var.foo}
+- simple maths: ${count.index + 1}
+- can use conditions
+- escape $ with $$, ie $${foo} = ${foo}
+- use var. prefix for string variables
+- for maps: var.MAP["key"] example: ${var.amis["redhat"]}
+- lists: ${var.LIST} example: ${var.subnets}
+- list element: ${var.subnet[idx]}
+- own resource: self.ATTRIBUTE example ${self.private_ip}
+- other resources: ${TYPE.NAME.ATTRIBUTE} 
+  example ${aws_instance.web.id}
+- data source: ${data.aws_ami.ubuntu.id}
+  - get all: ${data.aws_subnet.example.*.cidr_clock}
+- outputs from module: ${module.foo.bar}
+- specify path: path.TYPE (cwd, module, root)
+- conditions:
+  CONDITION ? TRUEVAL : FALSEVAL
+  sub = ${var.env == "prod" ? var.prod_sub: var.dev_sub }
+  - ==, !=, <, >, <=, >=., &&, ||, !
+  example:
+    resource "aws_instance" "vpn" {
+      count = "{var.something ? 1 : 0}"
+    }
+  - the 'vpn' resource will only be included if something is true
+- functions:
+  functions are called withthe syntax name(arg1, arg1, ...)
+  - common functions:
+    basename(path)
+    dirname(path)
+    file(path)
+    join(delim, list)
+    keys(map)
+    list(items, ...)
+    lookup(map, key, [default])
+    map(key, value, ...)
+    timestamp()
+# overides
+- load files last and merge into config (not append)
+- filename called overide.tf or temp_overide.tf
+- loaded in alphabetic order
+
+
+
+
+
+
+
