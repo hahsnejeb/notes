@@ -193,9 +193,44 @@
     - fast but advanced
   - amazon-ebssurrogate (ebs backed AMI from scratch, advanced)
  
+  - authentication:
+    - static credentials 
+      "access_key": "xsacec",
+      "secret_key": "nkjnkjn/njbb",
+      "region": "us-east-1",...
+    - environment variables:
+      export AWS_ACCESS_KEY_ID="bkbkj"
+      export AWS_SECRET_ACCESS_KEY="kbnkjb"...
+    - shared credentials file:
+      $HOME/.aws/credentials (default); or
+      export AWS_SHARED_CREDENTIALS_FILE="/home/..."; or
+      "profile": "customprofile" (set profile config option"
+    - ec2 role:
+      set minimum required options (see docs)
 - amazon-ebs volume builder
+  - create EBS VOlumes preinitialized with filesystem and data
+  - amazon-ebs:  create EBS vol by launching source AMI
+      with block devices mapped.  Provision instance, then
+      destroy iy, retaining the EBS volume
+  - builder creates temporary keypairs and security group to
+      allow temporary access to instance for configuring
+      - temporary resourced created with "packer" prefix default
+  - many resources available - some useful ones (all required):
+    - access_key, secret_key
+    - ami_name, instance_type, source_ami
+  - options resources:
+    - ami_block_device_mappings (array):  add devices to AMI
+      - delete_on_termination, device_name, envrypted (boolean)
+      - volume_size, volume_type
+    - ami_description, ami_regions, ami_virtualization_type,
+      associate_public_ip_address, etc
+      (see docs for full list of options)
+- access instance to debug:
+    run builder with -debug (key is saved in current directort
+      and DNS/IP will be outputted so you can log in
+- tags - add array of tags, e.g.
+  "{ "tags" { "Name": "test", ... } }"
 
-
-
-    
-
+# provisioners
+- install/configure machine after booting.  options:
+  - ansible_local
