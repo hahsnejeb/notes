@@ -232,5 +232,48 @@
   "{ "tags" { "Name": "test", ... } }"
 
 # provisioners
-- install/configure machine after booting.  options:
-  - ansible_local
+- install/configure machine after booting.  useful ones:
+  - ansible_local:
+    - would require ansible installed prior
+    - can copy playbooks from local host, etc
+    - checkout docs for full list of sub-options
+  - file:
+    - upload files
+    - upload directories
+    - symbolic links
+  - shell: (shell scripts):
+    - required options are:
+      "inline" (array of strings)
+      "script" (path to upload and execute script)
+      "scripts" (array of strings)
+    - optional:
+      "environment_vars"
+      "execute_command"
+        default: chmod +x {{ .Path }}; {{ .Vars }} {{ .Path }}
+      "inline_shbang" (other than /bin/sh)
+      "remote_path"
+    - see examples in docs
+    - can also restart and include "pause_before" to pause next
+    - ssh agent forwarding:
+      ssh to remote hosts during provisioning - example:
+      {
+        "type": "shell",
+        "inline": [
+          "sudo apt-get install -y git",
+          "ssh-keyscan github.com >> ~/.ssh/known_hosts",
+          "git clone git@github.com:exampleorg/myprivaterepo.git"
+        ]
+      }
+    - "shell-local": 
+        - run script on local packer machine
+        - similar options to above:
+          - command, inline, script, scripts
+
+    - custom provioners (read docs to create custom ones)
+# post-processors
+- run after image is built and provisioned
+- used to upload artifatcs, re-package, etc
+- optional
+- read docs for options
+
+
