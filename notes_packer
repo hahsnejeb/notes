@@ -276,4 +276,17 @@
 - optional
 - read docs for options
 
+# environmental variables
+PACKER_CACHE_DIR
+PACKER_CONFIG
+PACKER_LOG
+PACKER_LOG_PATH
+TMPDIR
 
+# core configuration
+- $HOME/.packerconfig
+- PACKER_CONFIG environment variable
+- plugin_min_port (plugin_max_port):
+  - ports for communication with plugins 10,000-25,000
+
+# Debugging
